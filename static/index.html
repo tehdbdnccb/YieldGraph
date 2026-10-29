@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YieldGraph | Autonomous Underwriting Terminal</title>
+    <style>
+        :root {
+            --bg: #0a0a0a; --surface: #171717; --border: #333; 
+            --accent: #4ade80; --text: #ededed; --muted: #888; --error: #ef4444;
+            --mono: "JetBrains Mono", Menlo, Consolas, monospace;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background: var(--bg); color: var(--text); line-height: 1.5; 
+            height: 100vh; display: flex; flex-direction: column; overflow: hidden; 
+        }
+        
+        header { 
+            padding: 1rem 1.5rem; background: var(--surface); 
+            border-bottom: 1px solid var(--border); display: flex; 
+            justify-content: space-between; align-items: center; 
+        }
+        h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: -0.02em; display: flex; align-items: center; gap: 0.5rem; }
+        .status-dot { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 8px var(--accent); }
+        
+        .scenarios { display: flex; gap: 0.5rem; }
+        button { 
+            background: var(--bg); color: var(--text); border: 1px solid var(--border); 
+            padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.85rem; 
+            cursor: pointer; transition: all 0.2s; font-weight: 500;
+        }
+        button:hover { border-color: var(--accent); color: var(--accent); }
+        button.primary { background: var(--text); color: var(--bg); border: none; }
+        button.primary:hover { background: var(--accent); color: #000; }
+        button.danger { border-color: var(--error); color: var(--error); }
+        button.danger:hover { background: rgba(239, 68, 68, 0.1); }
+
+        .workspace { display: flex; flex: 1; overflow: hidden; }
+        .panel { flex: 1; display: flex; flex-direction: column; border-right: 1px solid var(--border); }
+        .panel-header { 
+            padding: 0.75rem 1.5rem; background: var(--surface); border-bottom: 1px solid var(--border); 
+            font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; 
+            display: flex; justify-content: space-between; color: var(--muted);
+        }
+        
+        .stream-container { flex: 1; padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem; }
+        
+        /* Agent Event Formatting */
+        .event { font-family: var(--mono); font-size: 0.85rem; padding-left: 1rem; border-left: 2px solid var(--border); animation: fadein 0.2s ease-out; }
+        .event.thought { border-color: var(--muted); color: var(--muted); }
+        .event.tool { border-color: #60a5fa; color: #93c5fd; background: rgba(96, 165, 250, 0.05); padding: 0.5rem 1rem; border-radius: 0 4px 4px 0; }
+        .event.final { 
+            border-color: var(--accent); color: var(--text); font-family: inherit; 
+            font-size: 1rem; padding: 1.5rem; background: rgba(74, 222, 128, 0.05); 
+            border-radius: 0 6px 6px 0; margin-top: 1rem;
+        }
+
+        /* Hoverable Citation Architecture */
+        .citation { 
+            display: inline-flex; align-items: center; padding: 0.1rem 0.4rem; margin: 0 0.2rem; 
+            background: rgba(74, 222, 128, 0.15); border: 1px solid rgba(74, 222, 128, 0.3); 
+            border-radius: 4px; color: var(--accent); font-family: var(--mono); 
+            font-size: 0.75rem; cursor: crosshair; position: relative; 
+        }
+        .citation .tooltip { 
+            visibility: hidden; width: 300px; background: #262626; color: #fff; text-align: left; 
+            border-radius: 6px; padding: 1rem; position: absolute; z-index: 50; 
+            bottom: 125%; left: 50%; transform: translateX(-50%) translateY(5px); opacity: 0; 
+            transition: all 0.2s; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5); 
+            border: 1px solid #444; pointer-events: none; font-family: var(--mono); font-size: 0.7rem;
+        }
+        .citation:hover .tooltip { visibility: visible; opacity: 1; transform: translateX(-50%) translateY(0); }
+        .tooltip-row { display: flex; justify-content: space-between; margin-bottom: 0.4rem; border-bottom: 1px dashed #444; padding-bottom: 0.2rem; }
+        .tooltip-key { color: var(--muted); }
+        .tooltip-val { color: var(--accent); font-weight: 600; }
+
+        /* Counterfactual Split Screen */
+        .ungrounded-panel { display: none; background: #0f0b0b; border-left: 2px solid var(--error); }
+        .ungrounded-panel.active { display: flex; animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .ungrounded-content { font-family: var(--mono); font-size: 0.85rem; color: #fca5a5; opacity: 0.9; }
+        .stat-badge { background: rgba(239, 68, 68, 0.15); color: var(--error); padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: bold; }
+
+        .input-bar { padding: 1rem 1.5rem; background: var(--surface); border-top: 1px solid var(--border); display: flex; gap: 1rem; }
+        input { flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 0.6rem 0.75rem; border-radius: 4px; font-size: 0.9rem; font-family: inherit; }
+        input:focus { outline: none; border-color: var(--accent); }
+
+        @keyframes fadein { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1><div class="status-dot"></div> YieldGraph Terminal</h1>
+        <div class="scenarios">
+            <!-- Judge-specific pre-warmed vectors -->
+            <button onclick="loadScenario('boehly')">[Scenario: Eldridge / Real Estate]</button>
+            <button onclick="loadScenario('abrams')">[Scenario: Live Nation / Tour Routing]</button>
+            <button onclick="loadScenario('calacanis')">[Scenario: LAUNCH / B2B Audit]</button>
+            <button id="toggle-split" class="danger" onclick="toggleUngrounded()">Compare: Ungrounded LLM</button>
+        </div>
+    </header>
+
+    <div class="workspace">
+        <div class="panel">
+            <div class="panel-header">
+                <span>Agentic Execution Trace (Groq GPT-OSS-120B + Qloo Live)</span>
+                <span style="color: var(--accent);">Qloo Grounded</span>
+            </div>
+            <div id="primary-stream" class="stream-container">
+                <!-- NDJSON stream renders here -->
+                <div class="event thought" style="opacity: 0.5;">Awaiting commercial underwriting parameters...</div>
+            </div>
+        </div>
+
+        <div id="counterfactual-panel" class="panel ungrounded-panel">
+            <div class="panel-header" style="color: var(--error); border-bottom-color: var(--error);">
+                <span>Counterfactual Audit</span>
+                <span>Ungrounded AI</span>
+            </div>
+            <div id="ungrounded-stream" class="stream-container ungrounded-content">
+                <div style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border);">
+                    <div><strong>WARNING: CENSUS / UNGROUNDED AI DETECTED</strong></div>
+                    <div style="color: var(--muted); margin-top: 0.5rem;">
+                        This output bypasses Qloo Locality Intelligence. It relies on generalized LLM weights and backward-looking demographic correlation, resulting in high commercial failure rates.
+                    </div>
+                </div>
+                <!-- LLM Hallucinations render here -->
+            </div>
+        </div>
+    </div>
+
+    <div class="input-bar">
+        <input type="text" id="concept-input" placeholder="Commercial Concept (e.g., Natural Wine Bar, A24 Film Screening)">
+        <input type="text" id="locations-input" placeholder="Target Catchments (e.g., Austin East Cesar Chavez)">
+        <button class="primary" onclick="executeUnderwriting()">Execute Arbitrage</button>
+    </div>
+
+    <script>
+        // Pre-Warmed Deal Scenarios mapped to specific judge biases
+        const SCENARIOS = {
+            boehly: {
+                concept: "Hi-Fi Listening Bar matching A24, Noma, and Aesop aesthetics",
+                locations: "Austin East Cesar Chavez, Miami Wynwood, LA Arts District"
+            },
+            abrams: {
+                concept: "Regional Electronic Music Tour + Boutique Beverage Sponsor Targeting",
+                locations: "Denver RiNo, Chicago West Loop, Brooklyn Williamsburg"
+            },
+            calacanis: {
+                concept: "High-Ticket B2B Retail Audit: Enterprise Sponsor Yield Mapping",
+                locations: "San Francisco Hayes Valley, NYC SoHo"
+            }
+        };
+
+        function loadScenario(key) {
+            const data = SCENARIOS[key];
+            document.getElementById('concept-input').value = data.concept;
+            document.getElementById('locations-input').value = data.locations;
+        }
+
+        function toggleUngrounded() {
+            const panel = document.getElementById('counterfactual-panel');
+            panel.classList.toggle('active');
+        }
+
+        // Transforms raw LLM text into interactive Qloo cryptographic citations
+        function formatCitations(text) {
+            // Matches format: [urn:entity:brand:aesop:affinity=0.94]
+            const regex = /\[urn:entity:([^:]+):([^:]+):affinity=([\d\.]+)\]/g;
+            return text.replace(regex, (match, domain, entity, score) => {
+                const yieldDelta = ((parseFloat(score) - 0.5) * 100).toFixed(1);
+                return `
+                    <span class="citation">
+                        ${entity} [${score}]
+                        <div class="tooltip">
+                            <div class="tooltip-row"><span class="tooltip-key">Graph Domain</span><span class="tooltip-val">${domain}</span></div>
+                            <div class="tooltip-row"><span class="tooltip-key">Resolved URN</span><span class="tooltip-val">urn:entity:${domain}:${entity}</span></div>
+                            <div class="tooltip-row"><span class="tooltip-key">Verified Affinity</span><span class="tooltip-val">${score}</span></div>
+                            <div class="tooltip-row"><span class="tooltip-key">Arbitrage Delta</span><span class="tooltip-val" style="color: ${yieldDelta > 0 ? '#4ade80' : '#ef4444'}">+${yieldDelta}% vs baseline</span></div>
+                        </div>
+                    </span>
+                `;
+            });
+        }
+
+        function appendEvent(containerId, cssClass, content) {
+            const container = document.getElementById(containerId);
+            const div = document.createElement('div');
+            div.className = `event ${cssClass}`;
+            div.innerHTML = content;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function executeUnderwriting() {
+            const concept = document.getElementById('concept-input').value;
+            const locations = document.getElementById('locations-input').value.split(',').map(s => s.trim());
+            const primaryStream = document.getElementById('primary-stream');
+            
+            if (!concept || locations.length === 0 || !locations[0]) return;
+            
+            primaryStream.innerHTML = '';
+            appendEvent('primary-stream', 'thought', `Initializing Qloo spatial pipeline for: ${concept}`);
+
+            try {
+                const response = await fetch('/api/underwrite', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ concept_description: concept, target_locations: locations })
+                });
+
+                if (!response.ok) throw new Error("API Gateway Rejected Request");
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // Retain incomplete chunk
+
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        const event = JSON.parse(line);
+                        
+                        // Event Router Matrix
+                        if (event.event_type === 'agent_thought') {
+                            appendEvent('primary-stream', 'thought', event.data.text);
+                        } else if (event.event_type === 'tool_execution') {
+                            const formattedArgs = JSON.stringify(JSON.parse(event.data.args), null, 2);
+                            appendEvent('primary-stream', 'tool', `<strong>${event.data.tool}</strong><br><pre>${formattedArgs}</pre>`);
+                        } else if (event.event_type === 'final_brief') {
+                            const htmlContent = formatCitations(event.data.text.replace(/\n/g, '<br>'));
+                            appendEvent('primary-stream', 'final', htmlContent);
+                            
+                            // Automatically trigger ungrounded comparison payload if available
+                            if(event.data.ungrounded_delta) {
+                                document.getElementById('ungrounded-stream').innerHTML += `
+                                    <br><br>LLM hallucinated recommendation overlap: 
+                                    <span class="stat-badge">${event.data.ungrounded_delta.overlap_percentage}%</span>
+                                    <br>Lost commercial yield: <span class="stat-badge">${event.data.ungrounded_delta.missed_revenue_multiplier}x</span>
+                                `;
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                appendEvent('primary-stream', 'thought', `<span style="color: var(--error)">Fatal Gateway Error: ${err.message}</span>`);
+            }
+        }
+    </script>
+</body>
+</html>
