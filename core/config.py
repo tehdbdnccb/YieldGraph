@@ -12,6 +12,7 @@ class AppConfig(BaseModel):
     groq_api_key: SecretStr = Field(..., min_length=10)
     groq_model: str = Field(default="openai/gpt-oss-120b")
     qloo_cache_mode: str = Field(default="live_cached")
+    cors_origins: list[str] = Field(default_factory=list)
 
 
 class SettingsLoader:
@@ -31,6 +32,11 @@ class SettingsLoader:
             groq_api_key=os.getenv("GROQ_API_KEY", "").strip(),
             groq_model=os.getenv("GROQ_MODEL", "openai/gpt-oss-120b").strip(),
             qloo_cache_mode=os.getenv("QLOO_CACHE_MODE", "live_cached").strip(),
+            cors_origins=[
+                origin.strip()
+                for origin in os.getenv("CORS_ORIGINS", "").split(",")
+                if origin.strip()
+            ],
         )
 
     def validate_keys(self, config: AppConfig) -> AppConfig:

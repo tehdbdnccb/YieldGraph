@@ -2,6 +2,7 @@
 import json
 from typing import AsyncGenerator
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from groq import AsyncGroq
@@ -54,6 +55,13 @@ class UnderwritingController:
 # Dependency Injection Setup
 settings_loader = SettingsLoader()
 app_config = settings_loader.validate_keys(settings_loader.load_env())
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=app_config.cors_origins,
+    allow_methods=["POST"],
+    allow_headers=["Content-Type"],
+)
 
 # Initialize the Groq inference engine and domain services
 groq_client = AsyncGroq(api_key=app_config.groq_api_key.get_secret_value())

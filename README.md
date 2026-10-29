@@ -18,3 +18,11 @@ Configure environment variables:Bashcp .env.example .env
 # Populate QLOO_API_KEY and GROQ_API_KEY
 Launch the ASGI server:Bashuvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
 Access the zero-auth judge execution environment at http://localhost:8000.
+
+## Vercel and Railway Deployment
+
+Deploy the static frontend to Vercel and the FastAPI backend to Railway. The
+frontend streams directly from `https://yieldgraph-production.up.railway.app`
+so NDJSON chunks are read as they arrive. Set `CORS_ORIGINS` in Railway to the
+exact Vercel origin (for example, `https://your-app.vercel.app`), without a
+trailing slash. For multiple Vercel/custom domains, separate origins with commas.

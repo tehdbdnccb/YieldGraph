@@ -206,7 +206,7 @@
             appendEvent('primary-stream', 'thought', `Initializing Qloo spatial pipeline for: ${concept}`);
 
             try {
-                const response = await fetch('/api/underwrite', {
+                const response = await fetch('https://yieldgraph-production.up.railway.app/api/underwrite', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ concept_description: concept, target_locations: locations })
